@@ -43,7 +43,7 @@ static void waitdisk(void) {
   //* 用0xC0与，就是取前两位，不可能同时出现两个1。
   //? 那么为什么不直接与0x20？判等或与
   // while ((inb(0x1F7) & 0xC0) != ATA_SR_DRDY) /* do nothing */;
-  while (!(inb(ATA_BAR0 + ATA_REG_STATUS) & ATA_SR_DRDY))
+  while (inb(ATA_BAR0 + ATA_REG_STATUS) & ATA_SR_BSY)
     ; /* wait ready */
 }
 
@@ -72,6 +72,7 @@ static void readsect(void *dst, uint32_t secno) {
   waitdisk();
 
   // read a sector
+  //* 这里除以4是因为insl是读取双字
   insl(ATA_BAR0, dst, SECTSIZE / 4);
 }
 
@@ -100,24 +101,30 @@ static void readseg(uintptr_t va, uint32_t count, uint32_t offset) {
 /* bootmain - the entry of bootloader */
 void bootmain(void) {
   // read the 1st page off disk
-  //* 读第一页4K数据，也就是8个扇区
+  //* 读第一页4K数据elf header，也就是8个扇区
   readseg((uintptr_t)ELFHDR, SECTSIZE * 8, 0);
 
   // is this a valid ELF?
+  //* 只需要验证前4个字节是否等于{0x7F,'E','L','F'}，注意小端序
   if (ELFHDR->e_magic != ELF_MAGIC) {
     goto bad;
   }
 
-  struct proghdr *ph, *eph;
+  //! add volatile to prohibit optimiz
+  /* volatile */ struct proghdr *ph, *eph;
 
   // load each program segment (ignores ph flags)
+  //* 读取程序段头，e_phoff是program header在elf中的偏移量(bytes)
   ph = (struct proghdr *)((uintptr_t)ELFHDR + ELFHDR->e_phoff);
+  //* 程序段头的数量
   eph = ph + ELFHDR->e_phnum;
   for (; ph < eph; ph++) {
+    //* 读取memsize个字节到对应虚拟地址(va+offset)处。
     readseg(ph->p_va & 0xFFFFFF, ph->p_memsz, ph->p_offset);
   }
 
   // call the entry point from the ELF header
+  //? 为什么只取后24位
   // note: does not return
   ((void (*)(void))(ELFHDR->e_entry & 0xFFFFFF))();
 

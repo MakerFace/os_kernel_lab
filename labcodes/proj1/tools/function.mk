@@ -12,7 +12,7 @@ OBJPREFIX	:= __objs_
 # wildcard返回$(1)/*下所有的文件(root/name.suf)
 # 最后在第二个结果中过滤满足第一个结果的所有单词
 listf = $(filter $(if $(2),$(addprefix %.,$(2)),%),\
-				$(wildcard $(addsuffix $(SLASH)*,$(1))))
+		  $(wildcard $(addsuffix $(SLASH)*,$(1))))
 
 # 第一个参数为
 # 把文件名去掉后缀后添加.o后缀，并添加obj/前缀
@@ -66,6 +66,7 @@ $$(foreach f,$(1),$$(eval $$(call cc_template,$$(f),$(2),$(3),$(5))))
 $$(__temp_packet__) += $$(__temp_objs__)
 endef
 
+# add objs to packet: (#objs, packet)
 define do_add_objs_to_packet
 __temp_packet__ := $(call packetname,$(2))
 ifeq ($$(origin $$(__temp_packet__)),undefined)
@@ -74,6 +75,7 @@ endif
 $$(__temp_packet__) += $(1)
 endef
 
+# add packets and objs to target (target, #packes, #objs[, cc, flags])
 define do_create_target
 __temp_target__ = $(call totarget,$(1))
 __temp_objs__ = $$(foreach p,$(call packetname,$(2)),$$($$(p))) $(3)
@@ -86,6 +88,7 @@ $$(__temp_target__): $$(__temp_objs__) | $$$$(dir $$$$@)
 endif
 endef
 
+# finish all
 define do_finish_all
 ALLDEPS = $$(ALLOBJS:.o=.d)
 $$(sort $$(dir $$(ALLOBJS)) $(BINDIR)$(SLASH) $(OBJDIR)$(SLASH)):
@@ -104,9 +107,12 @@ add_files = $(eval $(call do_add_files_to_packet,$(1),$(2),$(3),$(4),$(5)))
 # 添加中间文件到包
 add_objs = $(eval $(call do_add_objs_to_packet,$(1),$(2)))
 
-read_packet = $(foreach p,$(call packetname,$(1)),$($(p)))
-
 # 添加包和中间文件到目标
 create_target = $(eval $(call do_create_target,$(1),$(2),$(3),$(4),$(5)))
 
+read_packet = $(foreach p,$(call packetname,$(1)),$($(p)))
+
+add_dependency = $(eval $(1): $(2))
+
 finish_all = $(eval $(call do_finish_all))
+
