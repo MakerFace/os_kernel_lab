@@ -302,5 +302,21 @@ print_stackframe(void) {
       *           NOTICE: the calling funciton's return addr eip  = ss:[ebp+4]
       *                   the calling funciton's ebp = ss:[ebp]
       */
+     uint32_t ebp = read_ebp();
+     uint32_t eip = read_eip();
+     uint32_t argc = 4;
+     // 使用ebp等于判定是否到栈顶了
+     for (int i = 0; i < STACKFRAME_DEPTH && ebp; ++i) {
+       cprintf("ebp:0x%08x eip:0x%08x args:", ebp, eip);
+       for (int j = 0; j < argc; ++j) {  // TODO 怎么确定函数变量个数？
+         // cprintf("0x%08x ", *(uint32_t *)(ebp + 2 * j)); // ERROR
+         // 参数获取有问题，应该是((ebp+2)+j*4)
+         cprintf("0x%08x ", *(uint32_t *)(ebp + 2 + 4 * j));
+       }
+       cprintf("\n");
+       print_debuginfo(eip - 1);
+       eip = *(uintptr_t *)(ebp + 4);
+       ebp = *(uintptr_t *)(ebp);
+     }
 }
 
