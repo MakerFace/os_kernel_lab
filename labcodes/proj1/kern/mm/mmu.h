@@ -1,5 +1,6 @@
 #ifndef __KERN_MM_MMU_H__
 #define __KERN_MM_MMU_H__
+#include <defs.h>
 
 /* Eflags register */
 #define FL_CF            0x00000001    // Carry Flag
@@ -168,7 +169,7 @@ struct taskstate {
     uint16_t ts_padding10;
     uint16_t ts_t;            // trap on task switch
     uint16_t ts_iomb;        // i/o map base address
-};
+} __attribute__((packed));
 
 #endif /* !__KERN_MM_MMU_H__ */
 
