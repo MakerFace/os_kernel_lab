@@ -1,4 +1,10 @@
 .idea/*
+**/.clangd
+**/bin
+**/obj
+**/compile_commands.json
 os/target/*
 os/.idea/*
 Cargo.lock
+os_kernel_lab.code-workspace
+**/*.log
