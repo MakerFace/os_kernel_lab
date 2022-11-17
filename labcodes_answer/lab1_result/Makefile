@@ -42,12 +42,22 @@ endif
 
 # define compiler and flags
 
-HOSTCC		:= gcc
-HOSTCFLAGS	:= -g -Wall -O2
-
-CC		:= $(GCCPREFIX)gcc
-CFLAGS	:= -fno-builtin -fno-PIC -Wall -ggdb -m32 -gstabs -nostdinc $(DEFS)
+ifndef USELLVM
+HOSTCC:=gcc
+HOSTCFLAGS:= -g -Wall -O2
+CC:= $(GCCPREFIX)gcc
+CFLAGS:= -fno-builtin -fno-PIC -Wall -ggdb -m32 -gstabs -nostdinc $(DEFS)
+# 测试gcc是否支持-fno-stack-protector
 CFLAGS	+= $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
+else
+HOSTCC:=clang
+HOSTCFLAGS:= -g -Wall -O2
+CC:= clang
+CFLAGS:= -fno-builtin -fno-PIC -Wall -g -m32 -mno-sse -nostdinc $(DEFS)
+# 测试gcc是否支持-fno-stack-protector
+CFLAGS	+= $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
+endif
+
 CTYPE	:= c S
 
 LD      := $(GCCPREFIX)ld
