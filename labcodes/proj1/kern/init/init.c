@@ -9,6 +9,7 @@
 #include <intr.h>
 #include <pmm.h>
 #include <kmonitor.h>
+#include <x86.h>
 int kern_init(void) __attribute__((noreturn));
 void grade_backtrace(void);
 static void lab1_switch_test(void);
@@ -37,7 +38,7 @@ kern_init(void) {
 
     //LAB1: CAHLLENGE 1 If you try to do it, uncomment lab1_switch_test()
     // user/kernel mode switch test
-    //lab1_switch_test();
+    lab1_switch_test();
 
     /* do nothing */
     while (1);
@@ -84,11 +85,28 @@ lab1_print_cur_status(void) {
 static void
 lab1_switch_to_user(void) {
     //LAB1 CHALLENGE 1 : TODO
+    // todo 发送T_SWITCH_TOU中断信号
+#ifdef DEBUG_SWITCH
+    cprintf("emission soft interpret 120\n");
+#endif
+    asm volatile(
+        "sub $0x8, %%esp\n"  //? why sub 0x8?
+        "int %0\n"
+        "movl %%ebp, %%esp"  //?
+        ::"i"(T_SWITCH_TOU));// 阻塞，直到用户进程结束吗？
 }
 
 static void
 lab1_switch_to_kernel(void) {
     //LAB1 CHALLENGE 1 :  TODO
+    // todo 发送T_SWITCH_TOK中断信号
+#ifdef DEBUG_SWITCH
+    cprintf("emission soft interpret 121\n");
+#endif
+    asm volatile(
+        "int %0\n"
+        "movl %%ebp, %%esp"  //?
+        ::"i"(T_SWITCH_TOK));
 }
 
 static void

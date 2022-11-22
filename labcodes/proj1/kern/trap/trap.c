@@ -2,6 +2,7 @@
 #include <mmu.h>
 #include <memlayout.h>
 #include <clock.h>
+#include <string.h>
 #include <trap.h>
 #include <x86.h>
 #include <stdio.h>
@@ -148,6 +149,9 @@ print_regs(struct pushregs *regs) {
     cprintf("  eax  0x%08x\n", regs->reg_eax);
 }
 
+/* 临时陷入帧 */
+struct trapframe switchk2u, *switchu2k;
+
 /* trap_dispatch - dispatch based on what type of trap occurred */
 static void
 trap_dispatch(struct trapframe *tf) {
@@ -167,19 +171,55 @@ trap_dispatch(struct trapframe *tf) {
             ticks = 0;
          }
         break;
+    //! COM是串口，qemu输出要选择-serial stdio，不能用-parallel stdio
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();
         cprintf("serial [%03d] %c\n", c, c);
         break;
+    // TODO 如何从这里获取输入呢？
     case IRQ_OFFSET + IRQ_KBD:
         c = cons_getc();
         cprintf("kbd [%03d] %c\n", c, c);
         break;
     //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     case T_SWITCH_TOU:
+      if (tf->tf_cs !=
+          USER_CS) {  //? 怎么表现出栈的切换呢？参数tf是原本的栈空间，复原时切换
+#ifdef DEBUG_SWITCH
+        cprintf("switch to user from kernel.\n");
+#endif
+        switchk2u = *tf;            //* copy一份
+        switchk2u.tf_cs = USER_CS;  //* 代码段寄存器变为用户进程的0x1b
+        switchk2u.tf_ds = switchk2u.tf_es = switchk2u.tf_ss =
+            USER_DS;  //* 数据段寄存器变为用户进程的
+        switchk2u.tf_esp =
+            (uint32_t)tf +            //* trapframe的首址
+            sizeof(struct trapframe)  //??? 增加一个trapframe大小存放中断环境
+            - 8;  //????? -8向下移动一个机器字长，指向真实的栈顶
+        //? 去掉特殊权限
+        switchk2u.tf_eflags |= FL_IOPL_MASK;
+        //? 栈顶指针esp复原时指向全局变量switchk2u的地址
+        *((uint32_t *)tf - 1) = (uint32_t)&switchk2u;
+      }
+      break;
     case T_SWITCH_TOK:
-        panic("T_SWITCH_** ??\n");
-        break;
+      cprintf("switch to kernel.\n");
+      //-- 检查权限DPL，是普通用户就切换
+      //* 如果不在内核态，就切换到内核态
+      if (tf->tf_cs != KERNEL_CS) {
+#ifdef DEBUG_SWITCH
+        cprintf("swithch to kernel from user");
+#endif
+        tf->tf_cs = KERNEL_CS;
+        tf->tf_ds = tf->tf_es = KERNEL_DS;
+        tf->tf_eflags &= ~FL_IOPL_MASK;
+        switchu2k =
+            (struct trapframe *)(tf->tf_esp - (sizeof(struct trapframe) - 8));
+        memmove(switchu2k, tf, sizeof(struct trapframe) - 8);
+        //?
+        *((uint32_t *)tf - 1) = (uint32_t)switchu2k;
+      }
+      break;
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:
         /* do nothing */

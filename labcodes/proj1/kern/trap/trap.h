@@ -44,8 +44,8 @@
  * These are arbitrarily chosen, but with care not to overlap
  * processor defined exceptions or interrupt vectors.
  * */
-#define T_SWITCH_TOU                120    // user/kernel switch
-#define T_SWITCH_TOK                121    // user/kernel switch
+#define T_SWITCH_TOU                120    // 0x78: user/kernel switch
+#define T_SWITCH_TOK                121    // 0x79: user/kernel switch
 
 /* registers as pushed by pushal */
 struct pushregs {
@@ -59,17 +59,20 @@ struct pushregs {
     uint32_t reg_eax;
 };
 
+/* 数据结构的顺序：地址越高越靠后，地址越低离esp越近 */
+/* 为什么pushregs的顺序和trapframe的顺序不一致？*/
+//! 是一致的，eax寄存器是靠近gs寄存器，
 struct trapframe {
     struct pushregs tf_regs;
     uint16_t tf_gs;
-    uint16_t tf_padding0;
+    uint16_t tf_padding0; //* 栈中只能压字？和双字！，需要填充0
     uint16_t tf_fs;
     uint16_t tf_padding1;
     uint16_t tf_es;
     uint16_t tf_padding2;
     uint16_t tf_ds;
     uint16_t tf_padding3;
-    uint32_t tf_trapno;
+    uint32_t tf_trapno; //* who push trapno?
     /* below here defined by x86 hardware */
     uint32_t tf_err;
     uintptr_t tf_eip;
