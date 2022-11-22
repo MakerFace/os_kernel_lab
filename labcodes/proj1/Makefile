@@ -44,6 +44,9 @@ endif
 
 .DELETE_ON_ERROR:
 
+# DEFS += -DDEBUG_GRADE
+DEFS += -DDEBUG_SWITCH
+
 ifndef USELLVM
 HOSTCC:=gcc
 HOSTCFLAGS:= -g -Wall -O2
@@ -231,7 +234,7 @@ qemu-mon: $(UCOREIMG)
 	$(V)$(QEMU) -no-reboot -monitor stdio -hda $< -serial null
 
 qemu: $(UCOREIMG)
-	$(V)$(QEMU) -no-reboot -parallel stdio -hda $< -serial null
+	$(V)$(QEMU) -no-reboot -parallel null -hda $< -serial stdio
 
 log: $(UCOREIMG)
 	$(V)$(QEMU) -no-reboot -d int,cpu_reset -D q.log -parallel stdio -hda $< -serial null
