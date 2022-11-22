@@ -308,10 +308,12 @@ print_stackframe(void) {
      // 使用ebp等于判定是否到栈顶了
      for (int i = 0; i < STACKFRAME_DEPTH && ebp; ++i) {
        cprintf("ebp:0x%08x eip:0x%08x args:", ebp, eip);
+       uint32_t *args = (uint32_t *)ebp + 2;
        for (int j = 0; j < argc; ++j) {  // TODO 怎么确定函数变量个数？
-         // cprintf("0x%08x ", *(uint32_t *)(ebp + 2 * j)); // ERROR
-         // 参数获取有问题，应该是((ebp+2)+j*4)
-         cprintf("0x%08x ", *(uint32_t *)(ebp + 2 + 4 * j));
+        //  cprintf("0x%08x ", *(uint32_t *)(ebp + 2 * j)); // ERROR
+         // 参数获取有问题，应该是((uint32_t *)(ebp)+2+j*4)
+        // cprintf("0x%08x ", *((uint32_t *)(ebp) + 2 + j));
+        cprintf("0x%08x ", args[j]);
        }
        cprintf("\n");
        print_debuginfo(eip - 1);
