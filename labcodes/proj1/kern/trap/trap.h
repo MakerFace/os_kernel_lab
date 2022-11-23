@@ -72,7 +72,7 @@ struct trapframe {
     uint16_t tf_padding2;
     uint16_t tf_ds;
     uint16_t tf_padding3;
-    uint32_t tf_trapno; //* who push trapno?
+    uint32_t tf_trapno; //* who push trapno? vectorn放入trapno,errno
     /* below here defined by x86 hardware */
     uint32_t tf_err;
     uintptr_t tf_eip;

@@ -40,7 +40,7 @@ __trapret:
     popl %es
     popl %ds
 
-    # get rid of the trap number and error code
+    # get rid of the trap number and error code, tf_trapno and tf_err
     addl $0x8, %esp
     iret
 
