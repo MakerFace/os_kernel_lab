@@ -183,6 +183,7 @@ trap_dispatch(struct trapframe *tf) {
         break;
     //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     case T_SWITCH_TOU:
+      //* 如果不在用户段，就切换到用户态
       if (tf->tf_cs !=
           USER_CS) {  //? 怎么表现出栈的切换呢？参数tf是原本的栈空间，复原时切换
 #ifdef DEBUG_SWITCH
@@ -191,21 +192,28 @@ trap_dispatch(struct trapframe *tf) {
         switchk2u = *tf;            //* copy一份
         switchk2u.tf_cs = USER_CS;  //* 代码段寄存器变为用户进程的0x1b
         switchk2u.tf_ds = switchk2u.tf_es = switchk2u.tf_ss =
-            USER_DS;  //* 数据段寄存器变为用户进程的
+            USER_DS;  //* 数据段寄存器变为用户进程的0x23
+        //????? 这块赋值没看懂
+        //? 中间栈空间用来存放中断函数调用栈，这部分可以当作用户空间？
+        //! 这部分用来【退掉】中断环境保存的临时栈，因为恢复是从switchk2u中
+        //! 恢复的，所以这部分的栈空间没有什么用了，如果不人为退掉的话，返回时
+        //! 可能会导致程序错误，也可能永远无法利用这部分栈空间，导致每次切换都
+        //! 失去一部分栈空间，最终导致内核空间越来越大而停止运行。
         switchk2u.tf_esp =
             (uint32_t)tf +            //* trapframe的首址
-            sizeof(struct trapframe)  //??? 增加一个trapframe大小存放中断环境
-            - 8;  //????? -8向下移动一个机器字长，指向真实的栈顶
+            sizeof(struct trapframe)  //* 减少一个trapframe大小退栈
+            - 8;  //* -8减去trapno, errno共8字节，trapEntry的iret也做了
         //? 去掉特殊权限
         switchk2u.tf_eflags |= FL_IOPL_MASK;
         //? 栈顶指针esp复原时指向全局变量switchk2u的地址
+        //? 这里为什么要减一，减一的地址不是push esp的地址嘛？
+        //? 为什么设置这里就可以让CPU从switchk2u处复原？
         *((uint32_t *)tf - 1) = (uint32_t)&switchk2u;
       }
       break;
     case T_SWITCH_TOK:
-      cprintf("switch to kernel.\n");
       //-- 检查权限DPL，是普通用户就切换
-      //* 如果不在内核态，就切换到内核态
+      //* 如果不在内核段，就切换到内核态
       if (tf->tf_cs != KERNEL_CS) {
 #ifdef DEBUG_SWITCH
         cprintf("swithch to kernel from user");
@@ -215,8 +223,8 @@ trap_dispatch(struct trapframe *tf) {
         tf->tf_eflags &= ~FL_IOPL_MASK;
         switchu2k =
             (struct trapframe *)(tf->tf_esp - (sizeof(struct trapframe) - 8));
-        memmove(switchu2k, tf, sizeof(struct trapframe) - 8);
-        //?
+        memmove(switchu2k, tf, sizeof(struct trapframe) - 8);//*拷贝tf到内核栈
+        //? 设置esp指向switchu2k，从这里恢复CPU
         *((uint32_t *)tf - 1) = (uint32_t)switchu2k;
       }
       break;
