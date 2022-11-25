@@ -8,6 +8,7 @@
 .set PROT_MODE_CSEG,        0x8                     # kernel code segment selector
 .set PROT_MODE_DSEG,        0x10                    # kernel data segment selector
 .set CR0_PE_ON,             0x1                     # protected mode enable flag
+.set SMAP,                  0x534d4150
 
 # start address should be 0:7c00, in real mode, the beginning address of the running bootloader
 .globl start
@@ -44,12 +45,32 @@ seta20.2:
     movb $0xdf, %al                                 # 0xdf -> port 0x60
     outb %al, $0x60                                 # 0xdf = 11011111, means set P2's A20 bit(the 1 bit) to 1
 
+probe_memory:
+    movl $0, 0x8000
+    xorl %ebx, %ebx
+    movw $0x8004, %di
+start_probe:
+    movl $0xE820, %eax
+    movl $20, %ecx
+    movl $SMAP, %edx
+    int $0x15
+    jnc cont
+    movw $12345, 0x8000
+    jmp finish_probe
+cont:
+    addw $20, %di
+    incl 0x8000
+    cmpl $0, %ebx
+    jnz start_probe
+finish_probe:
+
     # 切换到保护模式，初始化GDT表
     # Switch from real to protected mode, using a bootstrap GDT
     # and segment translation that makes virtual addresses
     # identical to physical addresses, so that the
     # effective memory map does not change during the switch.
-    lgdt gdtdesc # 放到哪里了呢？内存中，起始地址在GDTR中。
+    # 放到哪里了呢？内存中，起始地址在GDTR中。
+    lgdt gdtdesc
     # 把cr0寄存器从0x10(ET)置为0x11(ET Protect Enable)
     movl %cr0, %eax
     orl $CR0_PE_ON, %eax
@@ -72,14 +93,13 @@ protcseg:
     # Set up the stack pointer and call into C. The stack region is from 0--start(0x7c00)
     movl $0x0, %ebp
     movl $start, %esp
-    
-    # 向CGA输出hello world
     call bootmain
 
     # If bootmain returns (it shouldn't), loop.
 spin:
     jmp spin
 
+.data
 # Bootstrap GDT
 .p2align 2                                          # force 4 byte alignment
 gdt:

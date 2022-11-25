@@ -22,6 +22,10 @@ pic_setmask(uint16_t mask) {
     }
 }
 
+/**
+ * @brief 通过中断控制器使能中断
+ * @param  irq  中断请求号
+ */
 void
 pic_enable(unsigned int irq) {
     pic_setmask(irq_mask & ~(1 << irq));

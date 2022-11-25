@@ -9,7 +9,7 @@
 #include <intr.h>
 #include <pmm.h>
 #include <kmonitor.h>
-#include <x86.h>
+
 int kern_init(void) __attribute__((noreturn));
 void grade_backtrace(void);
 static void lab1_switch_test(void);
@@ -38,7 +38,7 @@ kern_init(void) {
 
     //LAB1: CAHLLENGE 1 If you try to do it, uncomment lab1_switch_test()
     // user/kernel mode switch test
-    lab1_switch_test();
+    //lab1_switch_test();
 
     /* do nothing */
     while (1);

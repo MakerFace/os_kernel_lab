@@ -1,4 +1,4 @@
-PROJ	:= proj1
+PROJ	:= proj
 EMPTY	:=
 SPACE	:= $(EMPTY) $(EMPTY)
 SLASH	:= /
@@ -51,22 +51,23 @@ ifndef USELLVM
 HOSTCC:=gcc
 HOSTCFLAGS:= -g -Wall -O2
 CC:= $(GCCPREFIX)gcc
-CFLAGS:= -fno-builtin -fno-PIC -Wall -ggdb -m32 -gstabs -nostdinc $(DEFS)
+CFLAGS:= -march=i686 -fno-builtin -fno-PIC -Wall -ggdb -m32 -gstabs -nostdinc $(DEFS)
 # 测试gcc是否支持-fno-stack-protector
 CFLAGS	+= $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 else
 HOSTCC:=clang
 HOSTCFLAGS:= -g -Wall -O2
 CC:= clang
-CFLAGS:= -fno-builtin -fno-PIC -Wall -g -m32 -mno-sse -nostdinc $(DEFS)
+CFLAGS:= -march=i686 -fno-builtin -fno-PIC -Wall -g -m32 -mno-sse -nostdinc $(DEFS)
 # 测试gcc是否支持-fno-stack-protector
 CFLAGS	+= $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 endif
 
+GDB		:= $(GCCPREFIX)gdb
 CTYPE	:= c S
 
 LD      := $(GCCPREFIX)ld
-LDFLAGS	:= -m $(shell $(LD) -V | grep elf_i386 2>/dev/null)
+LDFLAGS	:= -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1)
 LDFLAGS	+= -nostdlib
 
 OBJCOPY := $(GCCPREFIX)objcopy
@@ -82,6 +83,9 @@ SED		:= sed
 SH		:= sh
 TR		:= tr
 TOUCH	:= touch -c
+
+TAR		:= tar
+ZIP		:= gzip
 
 OBJDIR	:= obj
 BINDIR	:= bin
@@ -138,14 +142,17 @@ $(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)
 KINCLUDE	+= kern/debug/ \
 			   kern/driver/ \
 			   kern/trap/ \
-			   kern/mm/
+			   kern/mm/ \
+			   kern/libs/ \
+			   kern/sync/
 
 KSRCDIR		+= kern/init \
 			   kern/libs \
 			   kern/debug \
 			   kern/driver \
 			   kern/trap \
-			   kern/mm
+			   kern/mm \
+			   kern/sync
 
 KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
@@ -170,6 +177,20 @@ $(call create_target,kernel)
 
 ###################### end of kernel #######################
 
+###################### start of kernel_nopage #######################
+kernel_nopage = $(call totarget,kernel_nopage)
+
+$(kernel_nopage): tools/kernel_nopage.ld
+
+$(kernel_nopage): $(KOBJS)
+	@echo + ld $@
+	$(V)$(LD) $(LDFLAGS) -T tools/kernel_nopage.ld -o $@ $(KOBJS)
+	@$(OBJDUMP) -S $@ > $(call asmfile,kernel_nopage)
+	@$(OBJDUMP) -t $@ | $(SED) '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $(call symfile,kernel_nopage)
+
+$(call create_target,kernel)
+
+###################### end of kernel_nopage #######################
 
 ################## start of bootblock ######################
 # list boot 下的文件
@@ -183,7 +204,7 @@ bootblock = $(call totarget,bootblock)
 # ld命令，-e start表示执行入口，-Ttext表示text段存放地址。
 $(bootblock): $(call toobj,$(bootfiles)) | $(call totarget,sign)
 	@echo + ld $@
-	$(V)$(LD) $(LDFLAGS) -N -e start -T tools/boot.ld $^ -o $(call toobj,bootblock)
+	$(V)$(LD) $(LDFLAGS) -N -T tools/boot.ld $^ -o $(call toobj,bootblock)
 	@$(OBJDUMP) -S $(call objfile,bootblock) > $(call asmfile,bootblock)
 	@$(OBJCOPY) -S -O binary $(call objfile,bootblock) $(call outfile,bootblock)
 	@$(call totarget,sign) $(call outfile,bootblock) $(bootblock)
@@ -205,7 +226,7 @@ UCOREIMG	:= $(call totarget,ucore.img)
 # 为什么使用notrunc？在不截断文件的情况下，写入前512字节
 # 参见https://stackoverflow.com/a/20531600/15955867
 # 为什么seek=1？默认count=512B，也就是一个扇区大小
-$(UCOREIMG): $(kernel) $(bootblock)
+$(UCOREIMG): $(kernel) $(bootblock) $(kernel_nopage)
 	$(V)dd if=/dev/zero of=$@ count=10000
 	$(V)dd if=$(bootblock) of=$@ conv=notrunc
 	$(V)dd if=$(kernel) of=$@ seek=1 conv=notrunc
@@ -215,43 +236,46 @@ $(call create_target,ucore.img)
 
 $(call finish_all)
 
-IGNORE_ALLDEPS	= clean \
+IGNORE_ALLDEPS	= gdb \
+				  clean \
 				  dist-clean \
 				  grade \
 				  touch \
 				  print-.+ \
 				  handin
+
 ifeq ($(call match,$(MAKECMDGOALS),$(IGNORE_ALLDEPS)),0)
 -include $(ALLDEPS)
 endif
+
+# files for grade script
 
 TARGETS: $(TARGETS)
 
 .DEFAULT_GOAL := TARGETS
 
+QEMUOPTS = -hda $(UCOREIMG)
+
 .PHONY: qemu qemu-nox debug debug-nox
 qemu-mon: $(UCOREIMG)
-	$(V)$(QEMU) -no-reboot -monitor stdio -hda $< -serial null
-
+	$(V)$(QEMU)  -no-reboot -monitor stdio $(QEMUOPTS) -serial null
 qemu: $(UCOREIMG)
-	$(V)$(QEMU) -no-reboot -parallel null -hda $< -serial stdio
-
-log: $(UCOREIMG)
-	$(V)$(QEMU) -no-reboot -d int,cpu_reset -D q.log -parallel stdio -hda $< -serial null
+	$(V)$(QEMU)  -no-reboot -parallel null $(QEMUOPTS) -serial stdio
 
 qemu-nox: $(UCOREIMG)
-	$(V)$(QEMU) -no-reboot -serial mon:stdio -hda $< -nographic
+	$(V)$(QEMU)  -no-reboot -serial mon:stdio $(QEMUOPTS) -nographic
 
 TERMINAL := gnome-terminal
+
 debug: $(UCOREIMG)
-	$(V)$(TERMINAL) -e "$(QEMU) -no-reboot -S -s -parallel stdio -hda $< -serial null"				//将QEMU执行的信息存放在 q202.log 文件中
+	$(V)$(TERMINAL) -e "$(QEMU) -no-reboot -S -s -parallel stdio $(QEMUOPTS) -serial null"
 	$(V)sleep 2
-	$(V)$(TERMINAL) -e "gdb -q -tui -x tools/gdbinit"
-	
+	$(V)$(TERMINAL) -e "$(GDB) -q -tui -x tools/gdbinit"
+
 debug-nox: $(UCOREIMG)
-	$(V)$(QEMU) -S -s -serial mon:stdio -hda $< -nographic &
+	$(V)$(QEMU) -S -s -serial mon:stdio $(QEMUOPTS) -nographic &
 	$(V)sleep 2
-	$(V)$(TERMINAL) -e "gdb -q -x tools/gdbinit"
+	$(V)$(TERMINAL) -e "$(GDB) -q -x tools/gdbinit"
 
 .PHONY: grade touch
 
@@ -276,10 +300,10 @@ print-%:
 .PHONY: clean dist-clean handin packall tags
 clean:
 	$(V)$(RM) $(GRADE_GDB_IN) $(GRADE_QEMU_OUT) cscope* tags
-	-$(RM) -r $(OBJDIR) $(BINDIR)
+	$(V)$(RM) -r $(OBJDIR) $(BINDIR)
 
 dist-clean: clean
-	-$(RM) $(HANDIN)
+	$(V)$(RM) $(HANDIN)
 
 handin: packall
 	@echo Please visit http://learn.tsinghua.edu.cn and upload $(HANDIN). Thanks!
@@ -294,6 +318,3 @@ tags:
 	$(V)find . -type f -name "*.[chS]" >cscope.files
 	$(V)cscope -bq 
 	$(V)ctags -L cscope.files
-
-logger:
-	@echo "kobjs $(KOBJS)"

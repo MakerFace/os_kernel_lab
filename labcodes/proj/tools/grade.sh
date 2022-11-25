@@ -318,36 +318,28 @@ brkfun=readline
 
 ## check now!!
 
-quick_run 'Check Output'
+quick_run 'Check PMM'
+
+pts=20
+quick_check 'check pmm'                                         \
+    'memory management: default_pmm_manager'                     \
+    'check_alloc_page() succeeded!'                             \
+    'check_pgdir() succeeded!'                                  \
+    'check_boot_pgdir() succeeded!'
+
+pts=20
+quick_check 'check page table'                                  \
+    'PDE(0e0) c0000000-f8000000 38000000 urw'                   \
+    '  |-- PTE(38000) c0000000-f8000000 38000000 -rw'           \
+    'PDE(001) fac00000-fb000000 00400000 -rw'                   \
+    '  |-- PTE(000e0) faf00000-fafe0000 000e0000 urw'           \
+    '  |-- PTE(00001) fafeb000-fafec000 00001000 -rw'
 
 pts=10
-quick_check 'check ring 0'										\
-	'0: @ring 0'												\
-	'0:  cs = 8'												\
-	'0:  ds = 10'												\
-	'0:  es = 10'												\
-	'0:  ss = 10'
-
-quick_check 'check switch to ring 3'							\
-	'+++ switch to  user  mode +++'								\
-	'1: @ring 3'												\
-	'1:  cs = 1b'												\
-	'1:  ds = 23'												\
-	'1:  es = 23'												\
-	'1:  ss = 23'
-
-quick_check 'check switch to ring 0'							\
-	'+++ switch to kernel mode +++'								\
-	'2: @ring 0'												\
-	'2:  cs = 8'												\
-	'2:  ds = 10'												\
-	'2:  es = 10'												\
-	'2:  ss = 10'
-
-quick_check 'check ticks'										\
-	'++ setup timer interrupts'									\
-	'100 ticks'													\
-	'End of Test.'
+quick_check 'check ticks'                                       \
+    '++ setup timer interrupts'                                 \
+    '100 ticks'                                                 \
+    'End of Test.'
 
 ## print final-score
 show_final
